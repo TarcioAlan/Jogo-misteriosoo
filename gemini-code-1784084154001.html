@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>A Missão – Mayra & Tárcio</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0b0214;
+            font-family: 'VT323', monospace;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: 800px;
+            height: 100%;
+            max-height: 600px;
+            aspect-ratio: 4 / 3;
+            position: relative;
+            border: 6px solid #2e1c0c;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+            overflow: hidden;
+            background: #1a0c2e;
+        }
+
+        /* Viewport 3D */
+        #canvas3d {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Sobreposição de Interfaces */
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+            background: rgba(11, 2, 20, 0.65);
+        }
+
+        .ui-overlay.active {
+            display: flex;
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 20px;
+            color: #ffe066;
+            text-shadow: 3px 3px 0px #000;
+            margin-bottom: 15px;
+        }
+
+        h2 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            color: #ff80ab;
+            text-shadow: 2px 2px 0px #000;
+            margin-bottom: 10px;
+        }
+
+        p {
+            font-size: 22px;
+            line-height: 1.4;
+            text-shadow: 2px 2px 0px #000;
+            max-width: 90%;
+            margin-bottom: 15px;
+        }
+
+        /* Botões Estilo RPG/Aventura */
+        .pixel-btn {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 11px;
+            padding: 14px 22px;
+            background-color: #388e3c;
+            color: white;
+            border: 4px solid #fff;
+            border-style: outset;
+            cursor: pointer;
+            text-shadow: 1px 1px 0px #000;
+            box-shadow: 0 5px 0px #1b5e20, 0 8px 10px rgba(0,0,0,0.6);
+            margin: 8px;
+            display: inline-block;
+            transition: transform 0.05s;
+        }
+
+        .pixel-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 2px 0px #1b5e20, 0 4px 5px rgba(0,0,0,0.6);
+        }
+
+        .pixel-btn.blue { background-color: #1976d2; box-shadow: 0 5px 0px #0d47a1, 0 8px 10px rgba(0,0,0,0.6); }
+        .pixel-btn.red { background-color: #d32f2f; box-shadow: 0 5px 0px #7b1fa2, 0 8px 10px rgba(0,0,0,0.6); }
+
+        /* Barra HUD superior */
+        #hud-bar {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            z-index: 12;
+            display: none;
+            justify-content: space-between;
+            background: rgba(26, 12, 46, 0.85);
+            border: 3px solid #ffe066;
+            padding: 8px 15px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            border-radius: 6px;
+        }
+
+        /* Controles Mobile (D-pad virtual) */
+        #mobile-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 12;
+            display: none;
+            justify-content: space-between;
+            align-items: flex-end;
+            pointer-events: none;
+        }
+
+        .joy-btn {
+            width: 55px;
+            height: 55px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 3px solid #fff;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            color: #fff;
+            cursor: pointer;
+            pointer-events: auto;
+            touch-action: manipulation;
+        }
+        .joy-btn:active { background: rgba(255, 255, 255, 0.5); }
+
+        /* Grade de Baús */
+        #chest-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            max-width: 320px;
+            margin: 15px auto;
+        }
+
+        .chest-item {
+            width: 60px;
+            height: 60px;
+            background: #5d4037;
+            border: 3px solid #3e2723;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 0 #271510;
+        }
+        .chest-item.opened { background: #8d6e63; }
+
+        /* Zona do Forno / Preparo do Bolo */
+        #oven-zone {
+            width: 140px;
+            height: 140px;
+            border: 4px dashed #ff4081;
+            background: rgba(255, 64, 129, 0.15);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            margin: 15px 0;
+        }
+
+        .ingredients-list {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .ing-item {
+            padding: 8px 12px;
+            background: #3e2723;
+            border: 2px solid #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        #proposal-screen {
+            background: radial-gradient(circle, #311b92 30%, #0b0214 100%) !important;
+        }
+
+        #sound-toggle {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(0,0,0,0.7);
+            border: 2px solid #fff;
+            color: #fff;
+            padding: 5px 10px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 8px;
+            cursor: pointer;
+            z-index: 100;
+            border-radius: 4px;
+        }
+    </style>
+    <!-- Importando Biblioteca 3D (Three.js) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <button id="sound-toggle">🔊 SOM: ON</button>
+
+    <div id="game-container">
+        <!-- Renderizador 3D -->
+        <div id="canvas3d"></div>
+
+        <!-- HUD das Fases -->
+        <div id="hud-bar">
+            <div id="hud-level">FASE 1: DIAMANTES</div>
+            <div id="hud-objective">💎 COLETADOS: <span id="hud-score">0</span>/10</div>
+        </div>
+
+        <!-- D-Pad Mobile para Direcionamento -->
+        <div id="mobile-controls">
+            <div style="display: flex; gap: 8px; pointer-events: auto;">
+                <button class="joy-btn" id="btn-left">◀</button>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <button class="joy-btn" id="btn-up">▲</button>
+                    <button class="joy-btn" id="btn-down">▼</button>
+                </div>
+                <button class="joy-btn" id="btn-right">▶</button>
+            </div>
+        </div>
+
+        <!-- TELA 1: INTRODUÇÃO -->
+        <div id="screen-title" class="ui-overlay active" style="background: radial-gradient(circle, #2e1c0c 20%, #0b0214 100%);">
+            <h1>A MISSÃO</h1>
+            <h2>Dois Aventureiros, Uma Guilda</h2>
+            <p>Mayra & Tárcio encontraram o maior tesouro de todos: o amor.<br>Agora eles precisam reunir sua guilda para a missão mais importante de suas vidas... O Casamento!</p>
+            <div id="padrinho-welcome" style="font-family: 'Press Start 2P', cursive; font-size: 11px; color: #ffeb3b; margin-bottom: 15px;">Carregando aventura...</div>
+            <button class="pixel-btn" onclick="startLevel1()">ENTRAR NA AVENTURA</button>
+        </div>
+
+        <!-- TELA 2: FASE 3 – OS BAÚS -->
+        <div id="screen-lvl3" class="ui-overlay">
+            <h2>FASE 3: ENCONTRAR AS ALIANÇAS 💍</h2>
+            <p style="font-size: 16px;">Abra os 16 baús lendários organizados em 4x4 para encontrar as alianças sagradas!</p>
+            <div style="font-family: 'Press Start 2P', cursive; font-size: 10px; color: #ffeb3b; margin-bottom: 10px;">Alianças encontradas: <span id="lvl3-count">0</span>/2</div>
+            <div id="chest-grid"></div>
+            <p id="lvl3-status" style="font-size: 16px; min-height: 20px; color: #ffe066;"></p>
+            <button class="pixel-btn blue" id="lvl3-next-btn" style="display:none;" onclick="startLevel4()">AVANÇAR MISSÃO</button>
+        </div>
+
+        <!-- TELA 3: FASE 4 – ASSAR O BOLO -->
+        <div id="screen-lvl4" class="ui-overlay">
+            <h2>FASE 4: MONTAR O BOLO DE CASAMENTO 🎂</h2>
+            <p style="font-size: 16px;">Adicione ao forno apenas os ingredientes CORRETOS de um bolo perfeito!</p>
+            
+            <div id="oven-zone">
+                <span style="font-size: 36px;">🔥 🎛️</span>
+                <div style="margin-top: 5px;" id="baking-status">Forno Vazio</div>
+            </div>
+
+            <div class="ingredients-list">
+                <!-- Ingredientes Bons -->
+                <button class="ing-item" onclick="addIngredient(true, 'Leite')">🥛 Leite</button>
+                <button class="ing-item" onclick="addIngredient(true, 'Farinha de trigo')">🌾 Farinha</button>
+                <button class="ing-item" onclick="addIngredient(true, 'Ovos')">🥚 Ovos</button>
+                <button class="ing-item" onclick="addIngredient(true, 'Morango')">🍓 Morango</button>
+                <button class="ing-item" onclick="addIngredient(true, 'Açúcar')">🍬 Açúcar</button>
+                <!-- Ingredientes Ruins -->
+                <button class="ing-item" onclick="addIngredient(false, 'Saco de lixo')">🗑️ Lixo</button>
+                <button class="ing-item" onclick="addIngredient(false, 'Engrenagem')">⚙️ Engrenagem</button>
+                <button class="ing-item" onclick="addIngredient(false, 'Robô')">🤖 Robô</button>
+                <button class="ing-item" onclick="addIngredient(false, 'Pedra')">🪨 Pedra</button>
+                <button class="ing-item" onclick="addIngredient(false, 'Carro')">🚗 Carro</button>
+            </div>
+            <p id="lvl4-status-msg" style="font-size: 16px; color: #ffeb3b; margin-top: 10px; min-height: 20px;"></p>
+        </div>
+
+        <!-- TELA 4: CHEFÃO FINAL (PERGUNTA) -->
+        <div id="proposal-screen" class="ui-overlay">
+            <h1 style="color: #ff1744; font-size: 18px; margin-bottom: 20px; line-height: 1.4;">❤️ VOCÊ ACEITA SER NOSSO PADRINHO/MADRINHA?</h1>
+            
+            <div style="position: relative; width: 100%; height: 120px; display: flex; justify-content: center; align-items: center;">
+                <button class="pixel-btn" id="yes-btn" onclick="acceptProposal()">ACEITO COM MUITA ALEGRIA! 🟩</button>
+                <button class="pixel-btn red" id="no-btn" style="position: absolute; right: 10%;">Preciso pensar... 🟥</button>
+            </div>
+        </div>
+
+        <!-- TELA 5: SUCESSO FINAL -->
+        <div id="victory-screen" class="ui-overlay" style="background: radial-gradient(circle, #1b5e20 30%, #0b0214 100%) !important;">
+            <h1 style="color: #ffeb3b; font-size: 22px;">✨ MISSÃO CONCLUÍDA! ✨</h1>
+            <p style="font-size: 22px; color: #e0f2f1; max-width: 80%;">Agora você faz parte oficialmente da nossa história.</p>
+            <p style="font-size: 18px; color: #b2dfdb;">Esperamos você no nosso grande dia.</p>
+            <br>
+            <h2 style="color: #fff; font-size: 14px;">Com todo o carinho,</h2>
+            <h1 style="color: #ff4081; font-size: 24px;">Mayra ❤️ Tárcio</h1>
+        </div>
+
+    </div>
+
+    <script>
+        // Personalização do link pelo parâmetro ?padrinho=Nome
+        const urlParams = new URLSearchParams(window.location.search);
+        const padrinhoName = urlParams.get('padrinho') || urlParams.get('name') || "Incrível Convidado";
+        document.getElementById('padrinho-welcome').innerText = "Bem-vindo(a), " + padrinhoName + "!";
+
+        // Motor de áudio (8-bit synth via Web Audio API)
+        let audioCtx = null;
+        let isSoundOn = true;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        document.getElementById('sound-toggle').addEventListener('click', () => {
+            isSoundOn = !isSoundOn;
+            document.getElementById('sound-toggle').innerText = isSoundOn ? "🔊 SOM: ON" : "🔇 SOM: OFF";
+        });
+
+        function playSound(freq, duration, type="square") {
+            if (!isSoundOn) return;
+            initAudio();
+            try {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch(e){}
+        }
+
+        function sfxCollect() { playSound(587.33, 0.15, "sine"); setTimeout(() => playSound(880, 0.2, "sine"), 80); }
+        function sfxHurt() { playSound(130.81, 0.25, "sawtooth"); }
+        function sfxSuccess() { playSound(523, 0.1, "triangle"); setTimeout(() => playSound(659, 0.1, "triangle"), 80); setTimeout(() => playSound(783, 0.25, "triangle"), 160); }
+
+        // Configuração Geral do Three.js
+        let scene, camera, renderer, gameActive = false;
+        let activeLevel = 0;
+        let player3D;
+        let diamonds3D = [], monsters3D = [];
+        let keyboard = {};
+        let score = 0;
+        let lives = 3;
+
+        let touchKeys = { up: false, down: false, left: false, right: false };
+
+        function init3D() {
+            const container = document.getElementById('canvas3d');
+            scene = new THREE.Scene();
+            
+            // Céu com pôr do sol (Sunset)
+            scene.background = new THREE.Color(0xfd5e53);
+            scene.fog = new THREE.FogExp2(0xfd5e53, 0.03);
+
+            camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            // Luzes quentes do pôr do sol
+            const ambient = new THREE.AmbientLight(0xffccaa, 0.7);
+            scene.add(ambient);
+            const sunLight = new THREE.DirectionalLight(0xff8844, 1.2);
+            sunLight.position.set(30, 25, 40);
+            scene.add(sunLight);
+
+            // Chão do mapa
+            const groundGeo = new THREE.BoxGeometry(100, 2, 100);
+            const groundMat = new THREE.MeshPhongMaterial({ color: 0x3b5323, flatShading: true });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.position.y = -1;
+            scene.add(ground);
+
+            // Árvores em blocos (Estilo Unturned)
+            for(let i=0; i<35; i++) {
+                createUnturnedTree(Math.random()*80-40, Math.random()*80-40);
+            }
+
+            // Criação do Jogador (Unturned style)
+            const playerGroup = new THREE.Group();
+            const headGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+            const headMat = new THREE.MeshPhongMaterial({ color: 0xffdbac });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 1.4;
+            playerGroup.add(head);
+
+            const torsoGeo = new THREE.BoxGeometry(1, 1.2, 0.6);
+            const torsoMat = new THREE.MeshPhongMaterial({ color: 0x1976d2 });
+            const torso = new THREE.Mesh(torsoGeo, torsoMat);
+            torso.position.y = 0.6;
+            playerGroup.add(torso);
+
+            const legGeo = new THREE.BoxGeometry(0.4, 0.6, 0.4);
+            const legMat = new THREE.MeshPhongMaterial({ color: 0x3e2723 });
+            const legL = new THREE.Mesh(legGeo, legMat);
+            legL.position.set(-0.25, -0.1, 0);
+            const legR = legL.clone();
+            legR.position.x = 0.25;
+            playerGroup.add(legL);
+            playerGroup.add(legR);
+
+            player3D = playerGroup;
+            scene.add(player3D);
+
+            camera.position.set(0, 8, 8);
+            camera.lookAt(player3D.position);
+
+            window.addEventListener('resize', onWindowResize);
+            setupInput();
+        }
+
+        function createUnturnedTree(x, z) {
+            const tree = new THREE.Group();
+            const trunkGeo = new THREE.BoxGeometry(0.6, 3, 0.6);
+            const trunkMat = new THREE.MeshPhongMaterial({ color: 0x5d4037, flatShading: true });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 1.5;
+            tree.add(trunk);
+
+            const leafGeo = new THREE.BoxGeometry(2, 2, 2);
+            const leafMat = new THREE.MeshPhongMaterial({ color: 0x2e7d32, flatShading: true });
+            const leaves = new THREE.Mesh(leafGeo, leafMat);
+            leaves.position.y = 3.2;
+            tree.add(leaves);
+
+            tree.position.set(x, 0, z);
+            scene.add(tree);
+        }
+
+        function setupInput() {
+            window.addEventListener('keydown', e => keyboard[e.key] = true);
+            window.addEventListener('keyup', e => keyboard[e.key] = false);
+
+            const attachTouch = (id, key) => {
+                const btn = document.getElementById(id);
+                btn.addEventListener('touchstart', (e) => { e.preventDefault(); touchKeys[key] = true; });
+                btn.addEventListener('touchend', (e) => { e.preventDefault(); touchKeys[key] = false; });
+                btn.addEventListener('mousedown', () => touchKeys[key] = true);
+                btn.addEventListener('mouseup', () => touchKeys[key] = false);
+            };
+            attachTouch('btn-up', 'up');
+            attachTouch('btn-down', 'down');
+            attachTouch('btn-left', 'left');
+            attachTouch('btn-right', 'right');
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas3d');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // FASE 1: COLETAR DIAMANTES
+        function startLevel1() {
+            document.getElementById('screen-title').classList.remove('active');
+            document.getElementById('hud-bar').style.display = 'flex';
+            document.getElementById('mobile-controls').style.display = 'flex';
+            init3D();
+
+            activeLevel = 1;
+            score = 0;
+            document.getElementById('hud-level').innerText = "FASE 1: DIAMANTES";
+            document.getElementById('hud-score').innerText = "0";
+
+            // Criando os 10 Diamantes 3D
+            for(let i=0; i<10; i++) {
+                const dimGeo = new THREE.OctahedronGeometry(0.4, 0);
+                const dimMat = new THREE.MeshPhongMaterial({ color: 0x00e5ff, emissive: 0x006064, flatShading: true });
+                const mesh = new THREE.Mesh(dimGeo, dimMat);
+                mesh.position.set(Math.random()*40-20, 0.5, Math.random()*40-20);
+                scene.add(mesh);
+                diamonds3D.push(mesh);
+            }
+
+            gameActive = true;
+            animate();
+        }
+
+        // FASE 2: FUGIR DOS MONSTROS
+        function startLevel2() {
+            activeLevel = 2;
+            document.getElementById('hud-level').innerText = "FASE 2: FUGIR DOS MONSTROS";
+            document.getElementById('hud-objective').innerHTML = "VIDAS: <span id='lvl2-lives'>❤❤❤</span>";
+            lives = 3;
+
+            diamonds3D.forEach(d => scene.remove(d));
+            diamonds3D = [];
+
+            player3D.position.set(0, 0, 15);
+
+            // Criando Monstros em blocos
+            for(let i=0; i<8; i++) {
+                const monster = new THREE.Group();
+                const bodyGeo = new THREE.BoxGeometry(1.2, 1.6, 1.2);
+                const bodyMat = new THREE.MeshPhongMaterial({ color: 0xe91e63, flatShading: true });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 0.8;
+                monster.add(body);
+                
+                const eyeGeo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+                const eyeMat = new THREE.MeshPhongMaterial({ color: 0xffeb3b });
+                const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+                eyeL.position.set(-0.35, 1.1, 0.6);
+                const eyeR = eyeL.clone();
+                eyeR.position.x = 0.35;
+                monster.add(eyeL);
+                monster.add(eyeR);
+
+                monster.position.set(Math.random()*30-15, 0, -Math.random()*30);
+                scene.add(monster);
+                monsters3D.push({ mesh: monster, dir: Math.random() > 0.5 ? 1 : -1 });
+            }
+        }
+
+        // FASE 3: ENCONTRAR AS ALIANÇAS nos Baús
+        let ringsFound = 0;
+        let chestsData = [];
+        function startLevel3() {
+            gameActive = false;
+            document.getElementById('mobile-controls').style.display = 'none';
+            document.getElementById('hud-bar').style.display = 'none';
+            
+            document.getElementById('screen-lvl3').classList.add('active');
+
+            const grid = document.getElementById('chest-grid');
+            grid.innerHTML = "";
+            chestsData = [];
+            ringsFound = 0;
+
+            let chestContents = Array(16).fill('empty');
+            chestContents[3] = 'ring';
+            chestContents[11] = 'ring'; 
+            chestContents.sort(() => Math.random() - 0.5);
+
+            for(let i=0; i<16; i++) {
+                const chest = document.createElement('div');
+                chest.className = 'chest-item';
+                chest.innerText = "📦";
+                chest.onclick = () => openChest(i, chest);
+                grid.appendChild(chest);
+                chestsData.push({ hasRing: chestContents[i] === 'ring', opened: false });
+            }
+        }
+
+        function openChest(idx, elem) {
+            if (chestsData[idx].opened || ringsFound >= 2) return;
+            chestsData[idx].opened = true;
+            elem.classList.add('opened');
+
+            if (chestsData[idx].hasRing) {
+                elem.innerText = "💍";
+                ringsFound++;
+                sfxCollect();
+                document.getElementById('lvl3-count').innerText = ringsFound;
+                document.getElementById('lvl3-status').innerText = "Excelente! Uma aliança foi encontrada!";
+            } else {
+                elem.innerText = "💨";
+                playSound(220, 0.15, "triangle");
+                document.getElementById('lvl3-status').innerText = "Este baú estava vazio.";
+            }
+
+            if (ringsFound >= 2) {
+                document.getElementById('lvl3-status').innerText = "Ótimo! As alianças estão seguras.";
+                sfxSuccess();
+                document.getElementById('lvl3-next-btn').style.display = 'inline-block';
+            }
+        }
+
+        // FASE 4: MONTAR O BOLO
+        let recipe = { 'Leite': false, 'Farinha de trigo': false, 'Ovos': false, 'Morango': false, 'Açúcar': false };
+        function startLevel4() {
+            document.getElementById('screen-lvl3').classList.remove('active');
+            document.getElementById('screen-lvl4').classList.add('active');
+            resetBake();
+        }
+
+        function resetBake() {
+            recipe = { 'Leite': false, 'Farinha de trigo': false, 'Ovos': false, 'Morango': false, 'Açúcar': false };
+            document.getElementById('baking-status').innerText = "Forno Vazio";
+            document.getElementById('lvl4-status-msg').innerText = "";
+        }
+
+        function addIngredient(isGood, name) {
+            if (!isGood) {
+                sfxHurt();
+                document.getElementById('lvl4-status-msg').innerText = `Ops! Você colocou ${name} no bolo! A receita foi arruinada. Reiniciando forno!`;
+                setTimeout(() => resetBake(), 1800);
+                return;
+            }
+
+            if (recipe[name] === true) return;
+            recipe[name] = true;
+            sfxCollect();
+
+            let added = Object.keys(recipe).filter(k => recipe[k]);
+            document.getElementById('baking-status').innerText = `Adicionados: ${added.length}/5`;
+
+            if (added.length === 5) {
+                sfxSuccess();
+                document.getElementById('lvl4-status-msg').innerText = "O Bolo de Casamento está assado e perfeito!";
+                setTimeout(() => showBossIntro(), 1800);
+            }
+        }
+
+        // CHEFÃO FINAL: ENCONTRO DOS NOIVOS
+        function showBossIntro() {
+            document.getElementById('screen-lvl4').classList.remove('active');
+            
+            monsters3D.forEach(m => scene.remove(m.mesh));
+            monsters3D = [];
+            scene.remove(player3D);
+
+            // Boneco 3D da Mayra (Vestido branco, cabelo preto)
+            const bride = new THREE.Group();
+            const dressGeo = new THREE.BoxGeometry(1.4, 1.8, 1.4);
+            const dressMat = new THREE.MeshPhongMaterial({ color: 0xffffff });
+            const dress = new THREE.Mesh(dressGeo, dressMat);
+            bride.add(dress);
+
+            const brideHeadGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+            const brideHeadMat = new THREE.MeshPhongMaterial({ color: 0xffdbac });
+            const brideHead = new THREE.Mesh(brideHeadGeo, brideHeadMat);
+            brideHead.position.y = 1.3;
+            bride.add(brideHead);
+
+            const hairGeo = new THREE.BoxGeometry(0.9, 0.6, 0.9);
+            const hairMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
+            const hair = new THREE.Mesh(hairGeo, hairMat);
+            hair.position.y = 1.5;
+            bride.add(hair);
+            bride.position.set(-2, 1, -5);
+            scene.add(bride);
+
+            // Boneco 3D do Tárcio (Terno azul marinho escuro, cabelo preto)
+            const groom = new THREE.Group();
+            const suitGeo = new THREE.BoxGeometry(1.2, 1.8, 1);
+            const suitMat = new THREE.MeshPhongMaterial({ color: 0x0d1b2a });
+            const suit = new THREE.Mesh(suitGeo, suitMat);
+            groom.add(suit);
+
+            const groomHeadGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+            const groomHeadMat = new THREE.MeshPhongMaterial({ color: 0xffdbac });
+            const groomHead = new THREE.Mesh(groomHeadGeo, groomHeadMat);
+            groomHead.position.y = 1.3;
+            groom.add(groomHead);
+
+            const groomHairGeo = new THREE.BoxGeometry(0.85, 0.3, 0.85);
+            const groomHairMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
+            const groomHair = new THREE.Mesh(groomHairGeo, groomHairMat);
+            groomHair.position.set(0, 1.7, 0);
+            groom.add(groomHair);
+            groom.position.set(2, 1, -5);
+            scene.add(groom);
+
+            // Centraliza câmera nos noivos
+            camera.position.set(0, 2, 2);
+            camera.lookAt(0, 1.2, -5);
+
+            document.getElementById('proposal-screen').classList.add('active');
+            setupEvasiveButton();
+        }
+
+        // Botão "Preciso pensar..." Fugitivo
+        function setupEvasiveButton() {
+            const noBtn = document.getElementById('no-btn');
+            const container = document.getElementById('game-container');
+
+            const moveBtn = (e) => {
+                e.preventDefault();
+                let maxX = container.clientWidth - noBtn.clientWidth - 40;
+                let maxY = container.clientHeight - noBtn.clientHeight - 80;
+                let rx = Math.random() * maxX + 20;
+                let ry = Math.random() * maxY + 40;
+                noBtn.style.left = rx + 'px';
+                noBtn.style.top = ry + 'px';
+                playSound(330, 0.05, "sawtooth");
+            };
+
+            noBtn.onmouseover = moveBtn;
+            noBtn.ontouchstart = moveBtn;
+        }
+
+        // CELEBRAÇÃO DO SIM
+        let celebrateParticles = [];
+        function acceptProposal() {
+            document.getElementById('proposal-screen').classList.remove('active');
+            document.getElementById('victory-screen').classList.add('active');
+
+            sfxSuccess();
+            setTimeout(() => sfxSuccess(), 250);
+
+            // Gerar corações 3D flutuantes ao fundo
+            for(let i=0; i<40; i++) {
+                const hGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+                const hMat = new THREE.MeshPhongMaterial({ color: 0xff1744, emissive: 0x880e4f });
+                const heart = new THREE.Mesh(hGeo, hMat);
+                heart.position.set(Math.random()*8-4, -2, -6);
+                scene.add(heart);
+                celebrateParticles.push(heart);
+            }
+
+            activeLevel = 99; // Loop de comemoração
+        }
+
+        // GAME LOOP PRINCIPAL DO DESENVOLVIMENTO 3D
+        function animate() {
+            if (!gameActive && activeLevel !== 99) return;
+            requestAnimationFrame(animate);
+
+            if (activeLevel === 1 || activeLevel === 2) {
+                let speed = 0.25;
+                if (keyboard['ArrowUp'] || keyboard['w'] || touchKeys.up) player3D.position.z -= speed;
+                if (keyboard['ArrowDown'] || keyboard['s'] || touchKeys.down) player3D.position.z += speed;
+                if (keyboard['ArrowLeft'] || keyboard['a'] || touchKeys.left) player3D.position.x -= speed;
+                if (keyboard['ArrowRight'] || keyboard['d'] || touchKeys.right) player3D.position.x += speed;
+
+                player3D.position.x = Math.max(-40, Math.min(40, player3D.position.x));
+                player3D.position.z = Math.max(-40, Math.min(40, player3D.position.z));
+
+                camera.position.set(player3D.position.x, player3D.position.y + 7, player3D.position.z + 8);
+                camera.lookAt(player3D.position);
+            }
+
+            // Loop de colisão da fase de diamantes
+            if (activeLevel === 1) {
+                diamonds3D.forEach((dim, idx) => {
+                    dim.rotation.y += 0.04;
+                    let dist = player3D.position.distanceTo(dim.position);
+                    if (dist < 1.2) {
+                        scene.remove(dim);
+                        diamonds3D.splice(idx, 1);
+                        score++;
+                        sfxCollect();
+                        document.getElementById('hud-score').innerText = score;
+
+                        if (score >= 10) {
+                            sfxSuccess();
+                            startLevel2();
+                        }
+                    }
+                });
+            }
+
+            // Movimentação e colisão com os monstros
+            if (activeLevel === 2) {
+                monsters3D.forEach(m => {
+                    m.mesh.position.x += 0.15 * m.dir;
+                    if (Math.abs(m.mesh.position.x) > 20) m.dir *= -1;
+
+                    let dist = player3D.position.distanceTo(m.mesh.position);
+                    if (dist < 1.4) {
+                        sfxHurt();
+                        lives--;
+                        player3D.position.set(0, 0, 15);
+
+                        let livesStr = "";
+                        for(let i=0; i<lives; i++) livesStr += "❤";
+                        document.getElementById('lvl2-lives').innerText = livesStr || "SEM VIDAS";
+
+                        if (lives <= 0) {
+                            startLevel2();
+                        }
+                    }
+                });
+
+                // Chegada ao portal final da fase
+                if (player3D.position.z < -18) {
+                    sfxSuccess();
+                    startLevel3();
+                }
+            }
+
+            // Movimento ascendente dos corações 3D na vitória
+            if (activeLevel === 99) {
+                celebrateParticles.forEach(p => {
+                    p.position.y += 0.08;
+                    p.rotation.y += 0.03;
+                    if (p.position.y > 6) {
+                        p.position.y = -3;
+                        p.position.x = Math.random()*8-4;
+                    }
+                });
+            }
+
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
